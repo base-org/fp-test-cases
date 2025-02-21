@@ -142,13 +142,13 @@ update-l2-block-gas-limit:
     kurtosis files download {{ enclave }} op-deployer-configs
 
     SYSTEM_CONFIG_OWNER_PRIVATE_KEY={{ shell("cat " + wallets-path + " | jq '.[].systemConfigOwnerPrivateKey'") }}
-    L1_SYSTEM_CONFIG_ADRESS={{ shell("cat " + rollup-path + " | jq '.l1_system_config_address'") }}
+    L1_SYSTEM_CONFIG_ADDRESS={{ shell("cat " + rollup-path + " | jq '.l1_system_config_address'") }}
     L1_RPC_URL=$(kurtosis service inspect {{ enclave }} el-1-geth-teku | grep -- ' rpc: ' | sed 's/.*-> //')
 
     cast send \
         --private-key $SYSTEM_CONFIG_OWNER_PRIVATE_KEY \
         --rpc-url $L1_RPC_URL \
-        $L1_SYSTEM_CONFIG_ADRESS \
+        $L1_SYSTEM_CONFIG_ADDRESS \
         "setGasLimit(uint64)" \
         {{ l2-block-gas-limit }}
 
@@ -162,7 +162,7 @@ get-l2-block-gas-limit:
     rm -rf op-deployer-configs
     kurtosis files download {{ enclave }} op-deployer-configs
 
-    L1_SYSTEM_CONFIG_ADRESS={{ shell("cat " + rollup-path + " | jq '.l1_system_config_address'") }}
+    L1_SYSTEM_CONFIG_ADDRESS={{ shell("cat " + rollup-path + " | jq '.l1_system_config_address'") }}
     L1_RPC_URL=$(kurtosis service inspect {{ enclave }} el-1-geth-teku | grep -- ' rpc: ' | sed 's/.*-> //')
 
-    cast call --rpc-url $L1_RPC_URL $L1_SYSTEM_CONFIG_ADRESS  "gasLimit()(uint64)"
+    cast call --rpc-url $L1_RPC_URL $L1_SYSTEM_CONFIG_ADDRESS  "gasLimit()(uint64)"
