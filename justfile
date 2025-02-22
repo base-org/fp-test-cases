@@ -109,6 +109,53 @@ generate-fixture:
         --output {{ fixture-file }} \
         {{ verbosity }}
 
+generate-op-succinct-fixture:
+    #!/bin/bash
+    set -e
+
+    L1_RPC_URL=$(kurtosis service inspect {{ enclave }} el-1-geth-teku | grep -- ' rpc: ' | sed 's/.*-> //')
+    BEACON_URL=$(kurtosis service inspect {{ enclave }} cl-1-teku-geth  | grep -- ' http: ' | sed 's/.*-> //')
+    L2_RPC_URL=$(kurtosis service inspect {{ enclave }} op-el-1-op-geth-op-node-op-kurtosis | grep -- ' rpc: ' | sed 's/.*-> //')
+    ROLLUP_URL=$(kurtosis service inspect {{ enclave }} op-cl-1-op-node-op-geth-op-kurtosis | grep -- ' http: ' | sed 's/.*-> //')
+
+    forge script \
+        --non-interactive \
+        --password="" \
+        --rpc-url $L2_RPC_URL \
+        --account {{ account }} \
+        --broadcast \
+        --sig "{{ script-signature }}" \
+        script/{{ script-file }} \
+        {{ script-args }}
+
+    rm -rf op-deployer-configs
+    kurtosis files download {{ enclave }} op-deployer-configs
+
+    L2_BLOCK_NUM=$(($(jq < broadcast/{{ script-file }}/2151908/run-latest.json '.receipts[0].blockNumber' -r)))
+
+    while true; do
+        SYNC_STATUS=$(cast rpc optimism_syncStatus --rpc-url $ROLLUP_URL)
+        L2_SAFE_BLOCK_NUM=$(echo $SYNC_STATUS | jq '.safe_l2.number')
+        if [ $L2_SAFE_BLOCK_NUM -ge $((L2_BLOCK_NUM + 40)) ]; then
+            break
+        fi
+        echo "Waiting for L2 block $((L2_BLOCK_NUM + 40)) to be safe..., currently at $L2_SAFE_BLOCK_NUM"
+        sleep 10
+    done
+
+    mkdir -p {{ parent_directory(fixture-file) }}
+
+    L1_RPC="http://$L1_RPC_URL" \
+    L1_BEACON_RPC=$BEACON_URL \
+    L2_RPC=$L2_RPC_URL \
+    L2_NODE_RPC=$ROLLUP_URL \
+    {{ opfp }} from-op-succinct \
+        --l2-start-block $((L2_BLOCK_NUM)) \
+        --l2-end-block $((L2_BLOCK_NUM + 1)) \
+        --output {{ fixture-file }} \
+        {{ verbosity }}
+
+
 # Runs the given fixture through the op-program
 run-fixture:
     mkdir -p {{ parent_directory(op-program-output) }}
@@ -117,6 +164,11 @@ run-fixture:
         --op-program {{ op-program }} \
         --fixture {{ fixture-file }} \
         --output {{ op-program-output }} \
+        {{ verbosity }}
+
+run-op-succinct-fixture:
+    {{ opfp }} run-op-succinct \
+        --fixture {{ fixture-file }} \
         {{ verbosity }}
 
 # Runs the given fixture through Cannon and op-program
@@ -162,7 +214,7 @@ get-l2-block-gas-limit:
     rm -rf op-deployer-configs
     kurtosis files download {{ enclave }} op-deployer-configs
 
-    L1_SYSTEM_CONFIG_ADRESS={{ shell("cat " + rollup-path + " | jq '.l1_system_config_address'") }}
+    L1_SYSTEM_CONFIG_ADRESS={{ shell("cat " + rollup-path + " | jq -r '.l1_system_config_address'") }}
     L1_RPC_URL=$(kurtosis service inspect {{ enclave }} el-1-geth-teku | grep -- ' rpc: ' | sed 's/.*-> //')
 
     cast call --rpc-url $L1_RPC_URL $L1_SYSTEM_CONFIG_ADRESS  "gasLimit()(uint64)"

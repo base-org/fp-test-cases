@@ -28,8 +28,18 @@ alloy-primitives.workspace = true
 alloy-eips.workspace = true
 alloy-provider.workspace = true
 
+# Maili
+maili-genesis.workspace = true
+maili-protocol.workspace = true
+maili-registry.workspace = true
+
 # OP Types
 fp-test-fixtures.workspace = true
-superchain-primitives.workspace = true
 kona-derive.workspace = true
-superchain-registry.workspace = true
+kona-providers-alloy.workspace = true
+kona-host.workspace = true
+
+# OP Succinct
+op-succinct-client-utils.workspace = true
+op-succinct-host-utils.workspace = true
+sp1-sdk.workspace = true

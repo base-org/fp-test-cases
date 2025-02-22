@@ -2,7 +2,7 @@
 
 use alloy_primitives::hex::ToHexExt;
 use alloy_primitives::U64;
-use clap::{ArgAction, Parser};
+use clap::Parser;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use fp_test_fixtures::{ChainDefinition, FaultProofFixture};
@@ -10,8 +10,9 @@ use serde::{Deserialize, Serialize};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{env, path::PathBuf};
-use tracing::{debug, error, info, trace, warn};
+use tracing::info;
 
+use super::run_common::RunCommon;
 use super::util::{RollupConfig, VersionedState};
 
 /// The logging target to use for [tracing].
@@ -23,9 +24,6 @@ pub struct RunOpProgram {
     /// Path to the op-program binary
     #[clap(short, long, help = "Path to the op-program binary")]
     pub op_program: PathBuf,
-    /// Path to the fixture file
-    #[clap(short, long, help = "Path to the fixture file")]
-    pub fixture: PathBuf,
     /// Optional path to the cannon binary
     #[clap(short, long, help = "Path to the cannon binary")]
     pub cannon: Option<PathBuf>,
@@ -35,12 +33,9 @@ pub struct RunOpProgram {
     /// Optional cannon metadata
     #[clap(long, help = "Path to the cannon metadata")]
     pub cannon_meta: Option<PathBuf>,
-    /// Optional output file path
-    #[clap(long, help = "Path to the output file")]
-    pub output: Option<PathBuf>,
-    /// Verbosity level (0-4)
-    #[arg(long, short, help = "Verbosity level (0-4)", action = ArgAction::Count)]
-    pub v: u8,
+    /// Common arguments.
+    #[clap(flatten)]
+    pub common: RunCommon,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -74,7 +69,7 @@ struct CannonDebug {
 impl RunOpProgram {
     /// Runs the `run-op-program` subcommand.
     pub async fn run(&self) -> Result<()> {
-        let fixture = std::fs::read_to_string(&self.fixture)
+        let fixture = std::fs::read_to_string(&self.common.fixture)
             .map_err(|e| eyre!("Failed to read fixture file: {}", e))?;
         let fixture: FaultProofFixture = serde_json::from_str(&fixture)
             .map_err(|e| eyre!("Failed to parse fixture file: {}", e))?;
@@ -108,7 +103,7 @@ impl RunOpProgram {
                 let stats = cannon_command.run().await?;
                 info!(target: TARGET, "Cannon stats: {:?}", stats);
 
-                if let Some(output) = &self.output {
+                if let Some(output) = &self.common.output {
                     let file = std::fs::File::create(output)?;
                     serde_json::to_writer_pretty(file, &stats)?;
                 }
@@ -118,7 +113,7 @@ impl RunOpProgram {
                 let stats = op_program_command.run().await?;
                 info!(target: TARGET, "op-program stats: {:?}", stats);
 
-                if let Some(output) = &self.output {
+                if let Some(output) = &self.common.output {
                     let file = std::fs::File::create(output)?;
                     serde_json::to_writer_pretty(file, &stats)?;
                 }

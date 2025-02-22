@@ -3,12 +3,15 @@
 use alloy_primitives::hex::FromHex;
 use alloy_primitives::BlockHash;
 use alloy_primitives::{hex::ToHexExt, B256};
-use clap::{ArgAction, Parser};
+use clap::Parser;
 use color_eyre::{eyre::eyre, Result};
 use fp_test_fixtures::{
     self, ChainDefinition, FaultProofFixture, FaultProofInputs, FaultProofStatus, Genesis,
 };
-use kona_derive::online::*;
+use kona_derive::traits::ChainProvider;
+use kona_providers_alloy::{AlloyChainProvider, AlloyL2ChainProvider};
+use maili_protocol::BatchValidationProvider;
+use maili_registry::ROLLUP_CONFIGS;
 use reqwest::Url;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -18,11 +21,11 @@ use std::{
     io::{stderr, stdout},
     path::PathBuf,
 };
-use superchain_registry::ROLLUP_CONFIGS;
 use tracing::{debug, error, info, trace};
 
 use crate::cmd::util::RollupConfig;
 
+use super::from_common::FromComon;
 use super::util::{RollupProvider, SafeHeadResponse};
 
 /// The logging target to use for [tracing].
@@ -64,12 +67,9 @@ pub struct FromOpProgram {
     /// Optional path to the genesis file.
     #[clap(long, help = "Optional path to the genesis file")]
     pub genesis_path: Option<PathBuf>,
-    /// The output file for the test fixture.
-    #[clap(long, help = "Output file for the test fixture")]
-    pub output: PathBuf,
-    /// Verbosity level (0-4)
-    #[arg(long, short, help = "Verbosity level (0-4)", action = ArgAction::Count)]
-    pub v: u8,
+    /// Common arguments.
+    #[clap(flatten)]
+    pub common: FromComon,
 }
 
 impl FromOpProgram {
@@ -227,9 +227,9 @@ impl FromOpProgram {
         info!(target: TARGET, "Successfully built fault proof test fixture");
 
         // Write the fault proof fixture to the specified output location.
-        let file = std::fs::File::create(&self.output)?;
+        let file = std::fs::File::create(&self.common.output)?;
         serde_json::to_writer_pretty(file, &fixture)?;
-        info!(target: TARGET, "Wrote fault proof fixture to: {:?}", self.output);
+        info!(target: TARGET, "Wrote fault proof fixture to: {:?}", self.common.output);
 
         Ok(())
     }
@@ -242,7 +242,7 @@ impl FromOpProgram {
     /// Returns a new [AlloyL2ChainProvider] using the l2 rpc url.
     pub fn l2_provider(
         &self,
-        cfg: Arc<superchain_primitives::RollupConfig>,
+        cfg: Arc<maili_genesis::RollupConfig>,
     ) -> Result<AlloyL2ChainProvider> {
         Ok(AlloyL2ChainProvider::new_http(self.l2_rpc_url()?, cfg))
     }
@@ -255,7 +255,7 @@ impl FromOpProgram {
     /// Gets the rollup config from the l2 rpc url.
     pub async fn rollup_config(&self) -> Result<super::util::RollupConfig> {
         if let Some(path) = &self.rollup_path {
-            let file = std::fs::File::open(&path)?;
+            let file = std::fs::File::open(path)?;
             let cfg: super::util::RollupConfig = serde_json::from_reader(file)?;
             return Ok(cfg);
         }

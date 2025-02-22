@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use alloy_primitives::{Address, BlockHash, BlockNumber, Bytes, ChainId, B256, U256};
-use superchain_primitives::RollupConfig;
+use maili_genesis::RollupConfig;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
@@ -246,7 +246,7 @@ pub enum FaultProofStatus {
 }
 
 impl TryFrom<u8> for FaultProofStatus {
-        type Error = String;
+    type Error = String;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
